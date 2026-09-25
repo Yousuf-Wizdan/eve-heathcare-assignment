@@ -1,0 +1,4 @@
+# Force LF for shell scripts (Docker requires LF)
+*.sh text eol=lf
+# Force LF for entrypoint scripts
+docker-entrypoint* text eol=lf
