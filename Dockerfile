@@ -15,6 +15,6 @@ COPY --from=build /app/generated ./generated
 COPY --from=build /app/prisma ./prisma
 COPY package*.json ./
 COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh
 EXPOSE 4000
 ENTRYPOINT ["./docker-entrypoint.sh"]
