@@ -152,6 +152,28 @@ describe('Centres & Tests', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.length).toBeGreaterThan(0);
   });
+
+  it('POST /api/centres/:centreId/tests attaches test with price', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email: 'admin@example.com', password: 'Admin123!' });
+    const adminToken = login.body.data.token;
+
+    const testRes = await request(app)
+      .post('/api/tests')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: `Regression Test ${ts}`, description: 'Regression' });
+    const newTestId = testRes.body.data.id;
+
+    const res = await request(app)
+      .post(`/api/centres/${centreId}/tests`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ testId: newTestId, price: 123.45 });
+    expect(res.status).toBe(201);
+
+    const detail = await request(app).get(`/api/centres/${centreId}`);
+    const attached = detail.body.data.tests.find((t: { testId: string }) => t.testId === newTestId);
+    expect(attached).toBeTruthy();
+    expect(attached.price).toBe('123.45');
+  });
 });
 
 // ── 5. Booking Creation & Amount Snapshot ────────────────────────────────────

@@ -31,7 +31,7 @@ router.post(
   '/:centreId/tests',
   authenticate,
   requireRole('ADMIN'),
-  validate({ params: centreTestParamsSchema, body: attachTestSchema }),
+  validate({ params: centreParamsSchema, body: attachTestSchema }),
   asyncHandler(attachTestToCentre),
 );
 router.patch(
