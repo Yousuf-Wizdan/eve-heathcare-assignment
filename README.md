@@ -41,14 +41,27 @@ A backend service for diagnostic test booking and payments, built with Node.js, 
 docker-compose up -d
 ```
 
-This will start:
-- API server on port 4000
-- PostgreSQL database on port 5433
+This will:
+- Start a PostgreSQL database on port 5433
+- Build and start the API server on port 4000
+- Automatically run database migrations and seed data
 
-Then run migrations and seed:
+No `.env` file is needed — all configuration is provided via `docker-compose.yml` with sensible defaults.
+
+To view logs:
 ```bash
-docker-compose exec api npx prisma migrate deploy
-docker-compose exec api npx prisma db seed
+docker-compose logs -f api
+```
+
+To stop:
+```bash
+docker-compose down
+```
+
+To reset the database (delete volumes and restart):
+```bash
+docker-compose down -v
+docker-compose up -d
 ```
 
 ### Manual Installation
