@@ -228,7 +228,6 @@ PORT=4000
 
 # Database (Neon)
 DATABASE_URL=postgresql://user:pass@ep-xxxx-pooler.region.aws.neon.tech/db?sslmode=require
-DIRECT_URL=postgresql://user:pass@ep-xxxx.region.aws.neon.tech/db?sslmode=require
 
 # JWT
 JWT_SECRET=your-secret-key
@@ -243,8 +242,7 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=100
 ```
 
-- `DATABASE_URL` — Neon **pooled** connection string (used by the app at runtime)
-- `DIRECT_URL` — Neon **unpooled** (direct) connection string (used by Prisma CLI for migrations)
+- `DATABASE_URL` — Neon connection string (pooled or direct)
 - `PAYMENT_SUCCESS_RATE` — Probability (0–1) that a simulated payment succeeds (default: 0.85)
 - `JWT_EXPIRES_IN` — JWT token expiration (e.g. `1h`, `3600`)
 
