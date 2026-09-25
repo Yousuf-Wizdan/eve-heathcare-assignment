@@ -68,7 +68,7 @@ docker-compose up -d
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/Yousuf-Wizdan/eve-heathcare-assignment.git
 cd eve-diagnostics-api
 ```
 
@@ -316,7 +316,29 @@ The uniqueness guarantee lives in the database (`WebhookEvent.eventId @unique`),
 
 ## Testing
 
-Run all tests:
+The test suite uses a local PostgreSQL database (provided via Docker Compose) and the `.env.test` configuration file.
+
+### Setting up the test database
+
+1. Start the PostgreSQL container:
+```bash
+docker-compose up -d db
+```
+
+2. Apply database migrations (using the test database URL from `.env.test`):
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/eve_diagnostics_test" npx prisma migrate deploy
+```
+
+3. Seed the test database:
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/eve_diagnostics_test" npx prisma db seed
+```
+
+### Running tests
+
+Once the database is running, migrated, and seeded:
+
 ```bash
 npm test
 ```
@@ -325,6 +347,8 @@ Run integration tests only:
 ```bash
 npm run test:integration
 ```
+
+**Note:** Tests require PostgreSQL on `localhost:5433` (the Docker Compose `db` service). The `.env.test` file configures the test database connection. If the database container is not running or not seeded, tests will fail.
 
 ## Project Structure
 

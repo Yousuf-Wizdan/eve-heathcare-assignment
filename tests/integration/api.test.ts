@@ -579,6 +579,28 @@ describe('Webhook', () => {
     const recorded = await prisma.webhookEvent.findUnique({ where: { eventId } });
     expect(recorded).toBeTruthy();
   });
+
+  it('Short/malformed signature returns 401 (not 500)', async () => {
+    const body = JSON.stringify({ eventId: `evt-wh-${ts}-short`, eventType: 'y', bookingId: '00000000-0000-0000-0000-000000000000', paymentId: '00000000-0000-0000-0000-000000000000', status: 'SUCCESS' });
+    const shortSig = 'abc';
+    const res = await request(app)
+      .post('/api/payments/webhook')
+      .set('X-Webhook-Signature', shortSig)
+      .set('Content-Type', 'application/json')
+      .send(body);
+    expect(res.status).toBe(401);
+  });
+
+  it('Long/malformed signature returns 401 (not 500)', async () => {
+    const body = JSON.stringify({ eventId: `evt-wh-${ts}-long`, eventType: 'y', bookingId: '00000000-0000-0000-0000-000000000000', paymentId: '00000000-0000-0000-0000-000000000000', status: 'SUCCESS' });
+    const longSig = 'a'.repeat(256);
+    const res = await request(app)
+      .post('/api/payments/webhook')
+      .set('X-Webhook-Signature', longSig)
+      .set('Content-Type', 'application/json')
+      .send(body);
+    expect(res.status).toBe(401);
+  });
 });
 
 // ── 11. Webhook transitions booking state ───────────────────────────────────
