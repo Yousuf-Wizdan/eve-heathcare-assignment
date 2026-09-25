@@ -5,3 +5,4 @@ generated/
 *.log
 coverage/
 .DS_Store
+.commandcode/
