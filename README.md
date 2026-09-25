@@ -11,7 +11,8 @@ A backend service for diagnostic test booking and payments, built with Node.js, 
 - **ORM**: Prisma
 - **Authentication**: JWT with bcrypt password hashing
 - **Validation**: Zod
-- **Testing**: Jest + Supertest
+- **Logging**: Pino (structured JSON)
+- **API Docs**: Swagger/OpenAPI
 
 ## Features
 
@@ -20,7 +21,7 @@ A backend service for diagnostic test booking and payments, built with Node.js, 
 - Diagnostic centre and test management
 - Booking system with state machine (PENDING → CONFIRMED/FAILED/CANCELLED)
 - Payment simulation with idempotency
-- Webhook processing with idempotent event handling
+- Webhook processing with idempotent event handling (HMAC-SHA256 signed)
 - Pagination support
 - Rate limiting
 - Structured logging with Pino
@@ -33,7 +34,24 @@ A backend service for diagnostic test booking and payments, built with Node.js, 
 - Node.js 20+
 - PostgreSQL database (or Neon account)
 
-### Installation
+### Using Docker (Recommended)
+
+1. Build and run with Docker Compose:
+```bash
+docker-compose up -d
+```
+
+This will start:
+- API server on port 4000
+- PostgreSQL database on port 5433
+
+Then run migrations and seed:
+```bash
+docker-compose exec api npx prisma migrate deploy
+docker-compose exec api npx prisma db seed
+```
+
+### Manual Installation
 
 1. Clone the repository:
 ```bash
@@ -69,16 +87,12 @@ npm run dev
 
 The API will be available at `http://localhost:4000`
 
-### Using Docker
+### Building for Production
 
-1. Build and run with Docker Compose:
 ```bash
-docker-compose up -d
+npm run build
+npm start
 ```
-
-This will start:
-- API server on port 4000
-- PostgreSQL database on port 5433
 
 ## API Documentation
 
@@ -90,24 +104,57 @@ Once the server is running, visit:
 
 ### Authentication
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/signup` | Create a new user account |
-| POST | `/api/auth/login` | Authenticate and receive JWT |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/signup` | Public | Create a new user account |
+| POST | `/api/auth/login` | Public | Authenticate and receive JWT |
+
+**Signup example:**
+```bash
+curl -X POST http://localhost:4000/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Asha Rao", "email": "asha@example.com", "password": "S3cure!pass"}'
+
+# Response (201):
+# { "data": { "user": { "id": "...", "name": "Asha Rao", "email": "asha@example.com", "role": "USER" }, "token": "eyJhbGci..." } }
+```
+
+**Login example:**
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "asha@example.com", "password": "S3cure!pass"}'
+
+# Response (200):
+# { "data": { "token": "eyJhbGci..." } }
+```
 
 ### Diagnostic Centres
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/centres` | Public | List centres (with pagination, filter by location) |
-| GET | `/api/centres/:id` | Public | Get centre details with tests |
+| GET | `/api/centres` | Public | List centres (with pagination, filter by `?location=`) |
+| GET | `/api/centres/:id` | Public | Get centre details with tests and prices |
 | POST | `/api/centres` | Admin | Create a new centre |
+
+**Get centre detail example:**
+```bash
+# Use the UUID returned from the list centres endpoint
+curl http://localhost:4000/api/centres/<centre-uuid>
+
+# Response (200):
+# { "data": { "id": "...", "name": "HealthFirst Diagnostics", "location": "Bengaluru",
+#   "tests": [
+#     { "testId": "...", "name": "Complete Blood Count", "price": "450.00" },
+#     { "testId": "...", "name": "Lipid Profile", "price": "900.00" }
+#   ] } }
+```
 
 ### Diagnostic Tests
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/tests` | Public | List all tests |
+| GET | `/api/tests` | Public | List all tests (with pagination) |
 | POST | `/api/tests` | Admin | Create a new test |
 | POST | `/api/centres/:centreId/tests` | Admin | Attach test to centre with price |
 | PATCH | `/api/centres/:centreId/tests/:testId` | Admin | Update centre test price/status |
@@ -117,16 +164,60 @@ Once the server is running, visit:
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/api/bookings` | User | Create a new booking |
-| GET | `/api/bookings` | User | List user's bookings |
-| GET | `/api/bookings/:id` | User/Admin | Get booking details |
-| PATCH | `/api/bookings/:id/cancel` | User | Cancel a booking |
+| GET | `/api/bookings` | User | List user's bookings (filter by `?status=`) |
+| GET | `/api/bookings/:id` | User (owner) / Admin | Get booking details |
+| PATCH | `/api/bookings/:id/cancel` | User (owner) | Cancel a booking |
+
+**Create booking example:**
+```bash
+curl -X POST http://localhost:4000/api/bookings \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"centreId": "<centre-uuid>", "testId": "<test-uuid>", "appointmentAt": "2026-10-05T09:30:00.000Z"}'
+
+# Response (201):
+# { "data": { "id": "...", "status": "PENDING", "amount": "450", "appointmentAt": "2026-10-05T09:30:00.000Z" } }
+```
+
+**Cancel booking example:**
+```bash
+curl -X PATCH http://localhost:4000/api/bookings/<booking-id>/cancel \
+  -H "Authorization: Bearer <token>"
+
+# Response (200):
+# { "data": { "id": "...", "status": "CANCELLED" } }
+```
 
 ### Payments
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/payments` | User | Process payment for booking |
-| POST | `/api/payments/webhook` | Webhook | Receive payment status updates |
+| POST | `/api/payments` | User (owner) | Process payment for booking |
+| POST | `/api/payments/webhook` | Webhook signature | Receive payment status updates |
+
+**Process payment example:**
+```bash
+curl -X POST http://localhost:4000/api/payments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -H "Idempotency-Key: 9f1c2e6e-..." \
+  -d '{"bookingId": "<booking-id>"}'
+
+# Response (200):
+# { "data": { "paymentId": "...", "bookingId": "...", "status": "SUCCESS" } }
+```
+
+**Webhook example:**
+```bash
+# The webhook requires an HMAC-SHA256 signature of the raw request body
+curl -X POST http://localhost:4000/api/payments/webhook \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Signature: <hmac-sha256-of-body>" \
+  -d '{"eventId": "evt_8f2a...", "eventType": "payment.completed", "bookingId": "...", "paymentId": "...", "status": "SUCCESS"}'
+
+# Response (200):
+# { "data": { "received": true, "duplicate": false } }
+```
 
 ## Environment Variables
 
@@ -152,6 +243,11 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=100
 ```
 
+- `DATABASE_URL` — Neon **pooled** connection string (used by the app at runtime)
+- `DIRECT_URL` — Neon **unpooled** (direct) connection string (used by Prisma CLI for migrations)
+- `PAYMENT_SUCCESS_RATE` — Probability (0–1) that a simulated payment succeeds (default: 0.85)
+- `JWT_EXPIRES_IN` — JWT token expiration (e.g. `1h`, `3600`)
+
 ## Seed Data
 
 After running `npx prisma db seed`, the following test data is available:
@@ -176,25 +272,36 @@ After running `npx prisma db seed`, the following test data is available:
 
 The database uses the following main entities:
 
-- **User**: User accounts with role-based access
-- **DiagnosticCentre**: Physical diagnostic centres
-- **DiagnosticTest**: Test catalog entries
-- **CentreTest**: Links centres to tests with pricing
-- **Booking**: User bookings with status tracking
-- **Payment**: Payment records with idempotency
-- **WebhookEvent**: Idempotent webhook event logging
+- **User**: User accounts with role-based access (USER/ADMIN)
+- **DiagnosticCentre**: Physical diagnostic centres with location and active status
+- **DiagnosticTest**: Master test catalog entries (independent of centres)
+- **CentreTest**: Join entity linking centres to tests with per-centre pricing and active status
+- **Booking**: User bookings with status tracking (PENDING → CONFIRMED/FAILED/CANCELLED). Snapshots the price at booking time.
+- **Payment**: Payment records with idempotency keys. A booking can have multiple payment attempts; only one can confirm the booking.
+- **WebhookEvent**: Idempotent webhook event logging using a unique `eventId` constraint.
 
 ## Idempotency
 
 ### Payment Idempotency
 - Each payment request can include an `Idempotency-Key` header
-- Duplicate requests with the same key return the original result
-- Prevents duplicate charges from retry logic
+- If absent, the server generates one (UUID)
+- Duplicate requests with the same key return the original stored result without creating a new payment
+- Prevents duplicate charges from client retry logic
 
 ### Webhook Idempotency
-- Each webhook event has a unique `eventId`
-- Database constraint prevents duplicate processing
-- Duplicate events return `{ received: true, duplicate: true }`
+The webhook endpoint (`POST /api/payments/webhook`) uses a durable database-level idempotency mechanism:
+
+1. Verify the HMAC-SHA256 signature against the raw request body using `WEBHOOK_SECRET`
+2. Validate the payload shape with Zod
+3. Inside a transaction:
+   - Attempt to INSERT into `webhook_events` using the `eventId` as a unique key
+   - If the insert violates the unique constraint → already processed → return `200 { received: true, duplicate: true }`
+   - Otherwise, lock the booking row with `SELECT ... FOR UPDATE` to prevent race conditions
+   - If the booking is already in a terminal state (CONFIRMED/FAILED/CANCELLED) → no-op (idempotent)
+   - Otherwise, update the payment and booking status
+4. Return `200 { received: true, duplicate: false }`
+
+The uniqueness guarantee lives in the database (`WebhookEvent.eventId @unique`), not in application memory — correct under concurrent requests and multiple server instances.
 
 ## Testing
 
@@ -203,10 +310,9 @@ Run all tests:
 npm test
 ```
 
-Run specific test suites:
+Run integration tests only:
 ```bash
-npm run test:unit        # Unit tests only
-npm run test:integration # Integration tests only
+npm run test:integration
 ```
 
 ## Project Structure
@@ -241,20 +347,23 @@ src/
 ## Assumptions
 
 - PostgreSQL via Neon is used as the primary database (as per requirements)
-- JWT tokens are short-lived (1 hour) - refresh tokens are out of scope
+- JWT tokens are short-lived (1 hour default, configurable via `JWT_EXPIRES_IN`) — refresh tokens are out of scope
 - Payment simulation uses configurable success rate (default 85%)
 - Webhook signatures use HMAC-SHA256
-- Role-based access control is simplified (USER/ADMIN only)
+- Role-based access control is simplified to USER/ADMIN only
+- A user can only access their own bookings; admin can access all bookings
+- Booking cancellation is only allowed for PENDING or CONFIRMED bookings with a future appointment time
+- Decimal precision: all monetary values use `Decimal(10,2)` in the database and are serialized as numeric strings in API responses
 
 ## Future Improvements
 
-- [ ] Real payment gateway integration (Stripe, Razorpay)
-- [ ] Multi-currency support
-- [ ] Refresh token implementation
-- [ ] Full RBAC with granular permissions
-- [ ] Booking retry payment flow (FAILED → PENDING)
-- [ ] Redis caching for frequently accessed data
-- [ ] Background job processing with BullMQ
-- [ ] Full-text search for centres and tests
-- [ ] Email/SMS notifications
-- [ ] React admin dashboard
+- Real payment gateway integration (Stripe, Razorpay)
+- Multi-currency support
+- Refresh token implementation with token revocation
+- Full RBAC with granular permissions
+- Booking retry payment flow (FAILED → PENDING)
+- Redis caching for frequently accessed data
+- Background job processing with BullMQ
+- Full-text search for centres and tests
+- Email/SMS notifications
+- React admin dashboard

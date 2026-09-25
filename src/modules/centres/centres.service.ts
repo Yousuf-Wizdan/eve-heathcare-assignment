@@ -1,7 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
 import {
-  parsePagination,
   paginationMeta,
   paginationSkip,
   PaginationParams,

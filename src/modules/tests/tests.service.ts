@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
-import { parsePagination, paginationMeta, paginationSkip, PaginationParams } from '../../utils/pagination';
+import { paginationMeta, paginationSkip, PaginationParams } from '../../utils/pagination';
 
 export async function listTests(params: PaginationParams) {
   const [tests, total] = await Promise.all([

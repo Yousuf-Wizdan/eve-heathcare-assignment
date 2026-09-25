@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'node:crypto';
-import { prisma } from '../../config/prisma';
+import { prisma, Prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { ApiError } from '../../utils/ApiError';
 
@@ -28,25 +28,26 @@ export async function createPayment(
     };
   }
 
-  const booking = await prisma.booking.findUnique({
-    where: { id: data.bookingId },
-  });
-
-  if (!booking) {
-    throw ApiError.notFound('BOOKING_NOT_FOUND', 'Booking not found');
-  }
-
-  if (booking.userId !== userId) {
-    throw ApiError.forbidden('FORBIDDEN', 'Access denied');
-  }
-
-  if (booking.status !== 'PENDING') {
-    throw ApiError.conflict('BOOKING_NOT_PAYABLE', `Booking is ${booking.status.toLowerCase()}, cannot process payment`);
-  }
-
   const paymentStatus = simulatePayment();
 
-  const result = await prisma.$transaction(async (tx: typeof prisma) => {
+  const result = await prisma.$transaction(async (tx) => {
+    const bookings = await tx.$queryRaw<{ id: string; userId: string; amount: string; status: string }[]>`
+      SELECT id, "userId", amount, status FROM bookings WHERE id = ${data.bookingId} FOR UPDATE
+    `;
+    const booking = bookings[0];
+
+    if (!booking) {
+      throw ApiError.notFound('BOOKING_NOT_FOUND', 'Booking not found');
+    }
+
+    if (booking.userId !== userId) {
+      throw ApiError.forbidden('FORBIDDEN', 'Access denied');
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw ApiError.conflict('BOOKING_NOT_PAYABLE', `Booking is ${booking.status.toLowerCase()}, cannot process payment`);
+    }
+
     const payment = await tx.payment.create({
       data: {
         bookingId: data.bookingId,
@@ -87,13 +88,13 @@ export async function processWebhook(payload: {
   paymentId: string;
   status: PaymentStatus;
 }) {
-  return prisma.$transaction(async (tx: typeof prisma) => {
+  return prisma.$transaction(async (tx) => {
     try {
       await tx.webhookEvent.create({
         data: {
           eventId: payload.eventId,
           eventType: payload.eventType,
-          payload: payload as unknown as Record<string, unknown>,
+          payload: payload as unknown as Prisma.InputJsonValue,
         },
       });
     } catch (error: unknown) {
@@ -107,17 +108,19 @@ export async function processWebhook(payload: {
       throw error;
     }
 
-    const booking = await tx.booking.findUnique({
-      where: { id: payload.bookingId },
-    });
+    const bookings = await tx.$queryRaw<{ id: string; status: string }[]>`
+      SELECT id, status FROM bookings WHERE id = ${payload.bookingId} FOR UPDATE
+    `;
+    const booking = bookings[0];
 
     if (!booking) {
       return { received: true, duplicate: false, ignored: true };
     }
 
-    const payment = await tx.payment.findUnique({
-      where: { id: payload.paymentId },
-    });
+    const payments = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM payments WHERE id = ${payload.paymentId}
+    `;
+    const payment = payments[0];
 
     if (!payment) {
       return { received: true, duplicate: false, ignored: true };

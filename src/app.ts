@@ -15,7 +15,12 @@ const app = express();
 
 // Security & parsing
 app.use(helmet());
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({
+  limit: '10kb',
+  verify: (req, _res, buf) => {
+    (req as unknown as { rawBody?: string }).rawBody = buf.toString();
+  },
+}));
 
 // Rate limiting
 app.use(rateLimiter);

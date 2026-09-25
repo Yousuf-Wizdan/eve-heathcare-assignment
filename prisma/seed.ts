@@ -3,118 +3,72 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+const CENTRE_IDS = {
+  c1: '8989530c-8e75-4571-8494-8bc86160c2ec',
+  c2: '211e0936-c96f-43e6-8ce9-8fa76ffe959f',
+  c3: '87ba418c-9873-4bb1-b7ea-a65cd716b06c',
+};
+
+const TEST_IDS = {
+  t1: '76110df4-8b1a-48b0-9f00-ceee2d82db24',
+  t2: '9d27807a-6c65-4249-bdbe-251b40004fe0',
+  t3: '2b2fa15e-11d4-4c20-b63a-ca02e1f7a2eb',
+  t4: '4375b2e8-6625-46c1-a8d0-0a67ebed99ba',
+  t5: 'a31143e0-c564-4586-9ed4-69acb33fcb91',
+};
+
 async function main() {
   console.log('Seeding database...');
 
-  // Create users
   const passwordHash = await bcrypt.hash('Password123!', 10);
   const adminHash = await bcrypt.hash('Admin123!', 10);
 
   const user = await prisma.user.upsert({
     where: { email: 'user@example.com' },
     update: {},
-    create: {
-      name: 'Asha Rao',
-      email: 'user@example.com',
-      passwordHash,
-      role: 'USER',
-    },
+    create: { name: 'Asha Rao', email: 'user@example.com', passwordHash, role: 'USER' },
   });
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {},
-    create: {
-      name: 'Raj Admin',
-      email: 'admin@example.com',
-      passwordHash: adminHash,
-      role: 'ADMIN',
-    },
+    create: { name: 'Raj Admin', email: 'admin@example.com', passwordHash: adminHash, role: 'ADMIN' },
   });
 
-  // Create diagnostic centres
   const centre1 = await prisma.diagnosticCentre.upsert({
-    where: { id: 'centre-1' },
-    update: {},
-    create: {
-      id: 'centre-1',
-      name: 'HealthFirst Diagnostics',
-      location: 'Bengaluru',
-    },
+    where: { id: CENTRE_IDS.c1 }, update: {},
+    create: { id: CENTRE_IDS.c1, name: 'HealthFirst Diagnostics', location: 'Bengaluru' },
   });
-
   const centre2 = await prisma.diagnosticCentre.upsert({
-    where: { id: 'centre-2' },
-    update: {},
-    create: {
-      id: 'centre-2',
-      name: 'MediCare Labs',
-      location: 'Mumbai',
-    },
+    where: { id: CENTRE_IDS.c2 }, update: {},
+    create: { id: CENTRE_IDS.c2, name: 'MediCare Labs', location: 'Mumbai' },
   });
-
   const centre3 = await prisma.diagnosticCentre.upsert({
-    where: { id: 'centre-3' },
-    update: {},
-    create: {
-      id: 'centre-3',
-      name: 'CityHealth Diagnostics',
-      location: 'Delhi',
-    },
+    where: { id: CENTRE_IDS.c3 }, update: {},
+    create: { id: CENTRE_IDS.c3, name: 'CityHealth Diagnostics', location: 'Delhi' },
   });
 
-  // Create diagnostic tests
   const test1 = await prisma.diagnosticTest.upsert({
-    where: { id: 'test-1' },
-    update: {},
-    create: {
-      id: 'test-1',
-      name: 'Complete Blood Count',
-      description: 'Measures different components of blood including red cells, white cells, and platelets',
-    },
+    where: { id: TEST_IDS.t1 }, update: {},
+    create: { id: TEST_IDS.t1, name: 'Complete Blood Count', description: 'Measures different components of blood including red cells, white cells, and platelets' },
   });
-
   const test2 = await prisma.diagnosticTest.upsert({
-    where: { id: 'test-2' },
-    update: {},
-    create: {
-      id: 'test-2',
-      name: 'Lipid Profile',
-      description: 'Measures cholesterol levels including HDL, LDL, and triglycerides',
-    },
+    where: { id: TEST_IDS.t2 }, update: {},
+    create: { id: TEST_IDS.t2, name: 'Lipid Profile', description: 'Measures cholesterol levels including HDL, LDL, and triglycerides' },
   });
-
   const test3 = await prisma.diagnosticTest.upsert({
-    where: { id: 'test-3' },
-    update: {},
-    create: {
-      id: 'test-3',
-      name: 'Blood Glucose Fasting',
-      description: 'Measures blood sugar levels after fasting for 8-12 hours',
-    },
+    where: { id: TEST_IDS.t3 }, update: {},
+    create: { id: TEST_IDS.t3, name: 'Blood Glucose Fasting', description: 'Measures blood sugar levels after fasting for 8-12 hours' },
   });
-
   const test4 = await prisma.diagnosticTest.upsert({
-    where: { id: 'test-4' },
-    update: {},
-    create: {
-      id: 'test-4',
-      name: 'Thyroid Profile',
-      description: 'Measures TSH, T3, and T4 levels to assess thyroid function',
-    },
+    where: { id: TEST_IDS.t4 }, update: {},
+    create: { id: TEST_IDS.t4, name: 'Thyroid Profile', description: 'Measures TSH, T3, and T4 levels to assess thyroid function' },
   });
-
   const test5 = await prisma.diagnosticTest.upsert({
-    where: { id: 'test-5' },
-    update: {},
-    create: {
-      id: 'test-5',
-      name: 'Liver Function Test',
-      description: 'Measures liver enzymes and proteins to assess liver health',
-    },
+    where: { id: TEST_IDS.t5 }, update: {},
+    create: { id: TEST_IDS.t5, name: 'Liver Function Test', description: 'Measures liver enzymes and proteins to assess liver health' },
   });
 
-  // Link centres to tests with prices
   const centreTests = [
     { centreId: centre1.id, testId: test1.id, price: 450 },
     { centreId: centre1.id, testId: test2.id, price: 900 },
@@ -131,9 +85,7 @@ async function main() {
 
   for (const ct of centreTests) {
     await prisma.centreTest.upsert({
-      where: {
-        centreId_testId: { centreId: ct.centreId, testId: ct.testId },
-      },
+      where: { centreId_testId: { centreId: ct.centreId, testId: ct.testId } },
       update: { price: ct.price },
       create: ct,
     });
@@ -148,11 +100,5 @@ async function main() {
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+  .then(async () => { await prisma.$disconnect(); })
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });

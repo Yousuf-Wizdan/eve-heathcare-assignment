@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
-import { parsePagination, paginationMeta, paginationSkip, PaginationParams } from '../../utils/pagination';
+import { paginationMeta, paginationSkip, PaginationParams } from '../../utils/pagination';
 
 type BookingStatus = 'PENDING' | 'CONFIRMED' | 'FAILED' | 'CANCELLED';
 
@@ -115,7 +115,7 @@ export async function cancelBooking(bookingId: string, userId: string) {
     throw ApiError.conflict('BOOKING_NOT_CANCELLABLE', 'Cannot cancel a past booking');
   }
 
-  if (booking.status === 'CANCELLED' || booking.status === 'FAILED') {
+  if (!canTransition(booking.status, 'CANCELLED')) {
     throw ApiError.conflict('BOOKING_NOT_CANCELLABLE', `Booking is already ${booking.status.toLowerCase()}`);
   }
 
